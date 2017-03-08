@@ -1,0 +1,132 @@
+%correlation between activation differences and decoding CA
+
+roishort = {'L_ACC','L_AI','L_APFC','L_Amyg','L_DLPFC','L_IFJ','L_IPS','L_Vis',...
+            'R_ACC','R_AI','R_APFC','R_Amyg','R_DLPFC','R_IFJ','R_IPS','R_Vis'};
+        
+% roishort = {'L_HF','L_LTC','L_PHC','L_PPC','L_Rsp','L_TPJ','L_TempP','L_aMPFC','L_pIPL',...
+%     'R_HF','R_LTC','R_PHC','R_PCC','R_Rsp','R_TPJ','R_TempP','R_aMPFC','R_pIPL',...
+%     'dMPFC','vMPFC'};
+
+taskpairs = {NaN,'12','13','14','15','16',...
+             '21',NaN,'23','24','25','26',...
+             '31','32',NaN,'34','35','36',...
+             '41','42','43',NaN,'45','46',...
+             '51','52','53','54',NaN,'56',...
+             '61','62','63','64','65',NaN};
+         
+nrois = size(roishort);
+nrois = nrois(2);
+         
+num_rows = 6;
+num_cols = 6*nrois;
+         
+corr_supermatrix = NaN(num_rows,num_cols);
+reg_supermatrix = corr_supermatrix;
+goodness_supermatrix = corr_supermatrix;
+mean_activation_diff = corr_supermatrix;
+harder_task_matrix = corr_supermatrix;
+         
+%choose the ROI
+for ROInum = 1:nrois
+    
+    currentROI = roishort{ROInum};
+    display(currentROI())
+
+    %choose the task pair
+    for tasknum = 1:length(taskpairs)
+        
+        currentTasks = taskpairs{tasknum};        
+        
+
+        if ~isnan(currentTasks)
+        %get the activation difference from all subs
+        
+        RT_vector = Get_RT(currentTasks);
+        
+        RT_vector = RT_vector';
+        RT_hardertask = length(RT_vector(RT_vector>0));
+        
+              
+        RTmean = mean(abs(RT_vector));
+        RTsd = std(abs(RT_vector));                
+        ZRT_vector = (abs(RT_vector) - RTmean) / RTsd;
+        
+        
+        
+
+        %get the CA from all subs
+        
+        CA_vector = MVPA_CApairs(currentROI,currentTasks)';
+       
+        CAmean = mean(CA_vector);
+        CAsd = std(CA_vector);
+        
+        ZCA_vector = (CA_vector - CAmean) / CAsd;
+        
+%         scatter(activation_vector,CA_vector);
+
+
+        %correlate and regression of activation difference and CA
+        corr_rho = corrcoef(RT_vector,CA_vector);
+        corr_rho = corr_rho(1,2);
+        r2 = corr_rho^2;
+        
+        reg_beta = polyfit(ZRT_vector,ZCA_vector,1);
+        reg_beta = reg_beta(1); 
+
+
+        else
+            
+            corr_rho = NaN;
+            reg_beta = NaN;    
+            r2 = NaN;
+            RT_vector = NaN;
+            RT_hardertask = NaN;
+            
+        end
+        
+        %save value to a matrix.
+        
+        mat_row = ceil(tasknum / 6);
+        mat_col = ((ROInum -1)*6) + tasknum - ((mat_row-1)*6);
+        
+        corr_supermatrix(mat_row,mat_col) = corr_rho;
+        reg_supermatrix(mat_row,mat_col) = reg_beta;
+        goodness_supermatrix(mat_row,mat_col) = r2;
+        mean_RT_diff(mat_row,mat_col) = mean(RT_vector);
+        harder_task_matrix(mat_row,mat_col) = RT_hardertask;
+
+    end
+
+end
+
+figure(1);
+imagesc(corr_supermatrix);
+save('xRTcorr_matrix','corr_supermatrix');
+axis off; axis image;
+
+figure(2);
+imagesc(reg_supermatrix);
+save('xRTreg_matrix','reg_supermatrix');
+axis off; axis image;
+
+
+figure(3);
+imagesc(goodness_supermatrix*100);
+save('xRTgoodness_matrix','goodness_supermatrix')
+axis off; axis image;
+
+mean_RT_diff = mean_RT_diff(1:6,1:6);
+figure(4)
+imagesc(mean_RT_diff);
+save('xmean_RT_diff','mean_RT_diff');
+axis off; axis image;
+
+harder_task_matrix = harder_task_matrix(1:6,1:6);
+figure(5);
+imagesc(harder_task_matrix);
+save('xharder_task','harder_task_matrix');
+axis off; axis image;
+
+
+
